@@ -27,5 +27,34 @@ describe 'database' do
       "tiny-sql> ",
     ])
   end
+
+  it 'print error message when table is full' do
+    script = (1..1501) .map do |i|
+      "insert #{i} user#{i} person#{i}@example.com"
+    end
+    script << ".exit"
+    result = run_script(script)
+    expect(result[-2]).to eq("tiny-sql> Error: table full.")
+  end
+
+  it 'allows inserting strings that are the maximum length' do
+    log_username = "a"*32
+    log_email = "a"*255
+    script = [
+      "insert 1 #{log_username} #{log_email}",
+      "select",
+      ".exit",
+    ]
+    puts "\n"
+    puts script
+    puts "\n"
+    result = run_script(script)
+    expect(result).to match_array([
+      "tiny-sql> Executed.",
+      "tiny-sql> (1, #{log_username}, #{log_email})",
+      "Executed.",
+      "tiny-sql> ",
+    ])
+  end
 end
 
