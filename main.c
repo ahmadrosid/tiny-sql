@@ -159,6 +159,10 @@ PrepareResult prepare_statement(InputBuffer* input_buffer, Statement* statement)
     return PRINT_UNRECOGNIZE_STATEMENT;    
 }
 
+void close_db() {
+    
+}
+
 Table* open_db(const char* filename) {
     Pager* pager = pager_open(filename);
     uint32_t num_rows = pager->file_length / ROW_SIZE;
