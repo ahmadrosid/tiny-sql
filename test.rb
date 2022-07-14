@@ -52,5 +52,20 @@ describe 'database' do
       "tiny-sql> ",
     ])
   end
+
+  it 'prints an error message if id is negative' do
+    script = [
+      "insert -1 ahmadrosid some@mail.com",
+      "select",
+      ".exit"
+    ]
+
+    result = run_script(script)
+    expect(result).to match_array([
+      "tiny-sql> ID must be a positive",
+      "tiny-sql> Executed.",
+      "tiny-sql> "
+    ])
+  end
 end
 
