@@ -67,5 +67,25 @@ describe 'database' do
       "tiny-sql> "
     ])
   end
+
+  it 'keeps data after closing connection' do
+    result1 = run_script([
+      "insert 1 ahmadrosid some@mail.com",
+      ".exit"
+    ])
+    expect(result1).to match_array([
+      "tiny-sql> Executed.",
+      "tiny-sql> "
+    ])
+    result2 = run_script([
+      "select",
+      ".exit"
+    ])
+    expect(result2).to match_array([
+      "tiny-sql> (1, ahmadrosid, some@mail.com)",
+      "Executed.",
+      "tiny-sql> "
+    ])
+  end
 end
 
