@@ -240,8 +240,8 @@ int main(int argc, char* argv[]) {
                 printf("Syntax error. Could not parse statement.\n");
                 break;
             case (PREPARE_STRING_TOO_LONG):
-                printf("Error: string to long!\n");
-                break;
+                printf("Error: string is too long!\n");
+                continue;;
             case (PRINT_UNRECOGNIZE_STATEMENT):
                 printf("Unrecognize keyword at start of '%s'.\n",
                     input_buffer->buffer);

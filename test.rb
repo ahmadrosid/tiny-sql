@@ -38,21 +38,17 @@ describe 'database' do
   end
 
   it 'allows inserting strings that are the maximum length' do
-    log_username = "a"*32
-    log_email = "a"*255
+    log_username = "a"*33
+    log_email = "a"*256
     script = [
       "insert 1 #{log_username} #{log_email}",
       "select",
       ".exit",
     ]
-    puts "\n"
-    puts script
-    puts "\n"
     result = run_script(script)
     expect(result).to match_array([
+      "tiny-sql> Error: string is too long!",
       "tiny-sql> Executed.",
-      "tiny-sql> (1, #{log_username}, #{log_email})",
-      "Executed.",
       "tiny-sql> ",
     ])
   end
