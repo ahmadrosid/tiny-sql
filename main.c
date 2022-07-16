@@ -1,11 +1,11 @@
+#include <fcntl.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
 #include <stdint.h>
-#include <fcntl.h>
-#include <errno.h>
-
+#include <unistd.h>
 
 #define EXIT_SUCCESS_STATUS 1
 
@@ -17,14 +17,14 @@ typedef struct {
 
 typedef enum {
     META_COMMAND_SUCCESS,
-    META_COMMAND_UNRECOGNIZE_COMMAND
+    META_COMMAND_UNRECOGNIZED_COMMAND
 } MetaCommandResult;
 
 typedef enum {
     PREPARE_SUCCESS,
     PREPARE_SYNTACT_ERROR,
     PREPARE_STRING_TOO_LONG,
-    PRINT_UNRECOGNIZE_STATEMENT,
+    PRINT_UNRECOGNIZED_STATEMENT,
     PREPARE_NEGATIVE_ID
 } PrepareResult;
 
@@ -106,14 +106,6 @@ void close_input_buffer(InputBuffer* input_buffer) {
     free(input_buffer);
 }
 
-MetaCommandResult do_meta_command(InputBuffer* input_buffer) {
-    if (strcmp(input_buffer->buffer, ".exit") == 0) {
-        exit(EXIT_SUCCESS);
-    } else {
-        return META_COMMAND_UNRECOGNIZE_COMMAND;
-    }
-}
-
 PrepareResult prepare_insert(InputBuffer* input_buffer, Statement* statement) {
     statement->type = STATEMENT_INSERT;
     
@@ -156,20 +148,76 @@ PrepareResult prepare_statement(InputBuffer* input_buffer, Statement* statement)
         return PREPARE_SUCCESS;
     }
 
-    return PRINT_UNRECOGNIZE_STATEMENT;    
+    return PRINT_UNRECOGNIZED_STATEMENT;
 }
 
-void close_db() {
-    
+void pager_flush(Pager* pager, uint32_t page_num, uint32_t size) {
+    if (pager->pages[page_num] == NULL) {
+        printf("Tried to flush NULL page\n");
+        exit(EXIT_FAILURE);
+    }
+
+    off_t offset = lseek(pager->file_descriptor, page_num * PAGE_SIZE, SEEK_SET);
+    if (offset == -1) {
+        printf("Error seeking: %d\n", errno);
+        exit(EXIT_FAILURE);
+    }
+
+    ssize_t bytes_written = write(pager->file_descriptor, pager->pages[page_num], size);
+    if (bytes_written == -1) {
+        printf("Error writing: %d\n", errno);
+        exit(EXIT_FAILURE);
+    }
 }
 
-Table* open_db(const char* filename) {
-    Pager* pager = pager_open(filename);
-    uint32_t num_rows = pager->file_length / ROW_SIZE;
-    Table* table = malloc(sizeof(Table));
-    table->pager = pager;
-    table->num_rows = num_rows;
-    return table;
+void close_db(Table* table) {
+    Pager* pager = table->pager;
+    uint32_t num_full_pages = table->num_rows / ROWS_PER_PAGE;
+
+    for (uint32_t i = 0; i < num_full_pages; i++) {
+        if (pager->pages[i] == NULL) {
+            continue;
+        }
+        pager_flush(pager, i, PAGE_SIZE);
+        free(pager->pages[i]);
+        pager->pages[i] = NULL;
+    }
+
+    uint32_t additonal_rows = table->num_rows % ROWS_PER_PAGE;
+    if (additonal_rows > 0) {
+        uint32_t page_num = num_full_pages;
+        if (pager->pages[page_num] != NULL) {
+            pager_flush(pager, page_num, additonal_rows * ROW_SIZE);
+            free(pager->pages[page_num]);
+            pager->pages[page_num] = NULL;
+        }
+    }
+
+    int result = close(pager->file_descriptor);
+    if (result == -1) {
+        printf("Error closing db file\n");
+        exit(EXIT_FAILURE);
+    }
+
+    for (uint32_t i = 0; i < TABLE_MAX_PAGES; i++) {
+        void* page = pager->pages[i];
+        if (page) {
+            free(page);
+            pager->pages[i] = NULL;
+        }
+    }
+
+    free(pager);
+    free(table);
+}
+
+MetaCommandResult do_meta_command(InputBuffer* input_buffer, Table* table) {
+    if (strcmp(input_buffer->buffer, ".exit") == 0) {
+        close_db(table);
+        exit(EXIT_SUCCESS);
+    } else {
+        return META_COMMAND_UNRECOGNIZED_COMMAND;
+    }
 }
 
 Pager* pager_open(const char* filename) {
@@ -191,6 +239,15 @@ Pager* pager_open(const char* filename) {
     return pager;
 }
 
+Table* open_db(const char* filename) {
+    Pager* pager = pager_open(filename);
+    uint32_t num_rows = pager->file_length / ROW_SIZE;
+    Table* table = malloc(sizeof(Table));
+    table->pager = pager;
+    table->num_rows = num_rows;
+    return table;
+}
+
 void free_table(Table* table) {
     for (int i = 0; table->pager->pages[i]; i++) {
         free(table->pager->pages[i]);
@@ -200,7 +257,7 @@ void free_table(Table* table) {
 
 void* get_page(Pager* pager, uint32_t page_num) {
     if (page_num > TABLE_MAX_PAGES) {
-        printf("Tried to fetch page number of bounds: %d > %zu\n", page_num, TABLE_MAX_PAGES);
+        printf("Tried to fetch page number of bounds: %d > %d\n", page_num, TABLE_MAX_PAGES);
         exit(EXIT_FAILURE);
     }
 
@@ -283,17 +340,22 @@ ExecuteResult execute_statement(Statement* statement, Table* table) {
 }
 
 int main(int argc, char* argv[]) {
-    Table* table = open_db();
+    if (argc < 2) {
+        printf("must supply database name\n");
+        exit(EXIT_FAILURE);
+    }
+    char* filename = argv[1];
+    Table* table = open_db(filename);
     InputBuffer* input_buffer = new_input_buffer();
     while (true) {
         print_prompt();
         read_input(input_buffer);
 
         if (input_buffer->buffer[0] == '.') {
-            switch(do_meta_command(input_buffer)) {
+            switch(do_meta_command(input_buffer, table)) {
                 case (META_COMMAND_SUCCESS):
                     continue;
-                case (META_COMMAND_UNRECOGNIZE_COMMAND):
+                case (META_COMMAND_UNRECOGNIZED_COMMAND):
                     printf("Unrecognize command %s \n", input_buffer->buffer);
                     continue;
             }
@@ -312,8 +374,8 @@ int main(int argc, char* argv[]) {
             case (PREPARE_NEGATIVE_ID):
                 printf("ID must be a positive\n");
                 continue;
-            case (PRINT_UNRECOGNIZE_STATEMENT):
-                printf("Unrecognize keyword at start of '%s'.\n",
+            case (PRINT_UNRECOGNIZED_STATEMENT):
+                printf("Unrecognized keyword at start of '%s'.\n",
                     input_buffer->buffer);
                 continue;
         }

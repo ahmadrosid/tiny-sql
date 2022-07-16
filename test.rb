@@ -1,7 +1,11 @@
 describe 'database' do
+  before do
+    `rm -rf test.db`
+  end
+
   def run_script(commands)
     raw_output = nil
-    IO.popen("./tiny-sql", "r+") do |pipe|
+    IO.popen("./tiny-sql test.db", "r+") do |pipe|
       commands.each do |command|
         pipe.puts command
       end
