@@ -39,7 +39,7 @@ typedef enum {
 } NodeType;
 
 #define COLUMN_USERNAME_SIZE 32
-#define COLUMN_EMAIL_SIZE 225
+#define COLUMN_EMAIL_SIZE 255
 
 typedef struct {
     uint32_t id;
