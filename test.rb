@@ -91,5 +91,43 @@ describe 'database' do
       "tiny-sql> "
     ])
   end
+
+  it 'prints constants' do
+    script = [
+      ".constants",
+      ".exit"
+    ]
+    result = run_script(script);
+    expect(result).to match_array([
+      "tiny-sql> Constants:",
+      "ROW_SIZE: 263",
+      "COMMON_HEADER_NODE_SIZE: 6",
+      "LEAF_NODE_HEADER_SIZE: 10",
+      "LEAF_NODE_CELL_SIZE: 267",
+      "LEAF_NODE_SPACE_FOR_CELLS: 4086",
+      "LEAF_NODE_MAX_CELLS: 15",
+      "tiny-sql> "
+    ])
+  end
+
+  it 'allowing prints out the structure of a one-node btree' do 
+    script = [3, 1, 2].map do |i|
+      "insert #{i} user#{i} person${i}@mail.com"
+    end
+    script << ".btree"
+    script << ".exit"
+    result = run_script(script)
+    expect(result).to match_array([
+      "tiny-sql> Executed.", 
+      "tiny-sql> Executed.", 
+      "tiny-sql> Executed.", 
+      "tiny-sql> Tree:",
+      "leaf (size 3)", 
+      " - 1: 1", 
+      " - 2: 2", 
+      " - 0: 3", 
+      "tiny-sql> ", 
+    ])
+  end
 end
 
