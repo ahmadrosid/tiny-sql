@@ -123,11 +123,23 @@ describe 'database' do
       "tiny-sql> Executed.", 
       "tiny-sql> Tree:",
       "leaf (size 3)", 
-      " - 1: 1", 
-      " - 2: 2", 
-      " - 0: 3", 
+      " - 0: 1", 
+      " - 1: 2", 
+      " - 2: 3", 
       "tiny-sql> ", 
     ])
   end
-end
 
+  it 'prints error message if there is duplicate id' do
+    script = [
+      "insert 1 name name@mail.com",
+      "insert 1 name name@mail.com"
+    ]
+    result = run_script(script)
+    expect(result).to match_array([
+      "tiny-sql> Executed.",
+      "tiny-sql> Error: Duplicate key",
+      "tiny-sql> Error reading input",
+    ])
+  end
+end
