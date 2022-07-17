@@ -131,7 +131,6 @@ void initialize_leaf_node(void* node) {
     *leaf_node_num_cells(node) = 0;
 }
 
-
 typedef struct {
     int file_descriptor;
     uint32_t file_length;
