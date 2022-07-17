@@ -427,9 +427,12 @@ Cursor* table_start(Table* table) {
     Cursor* cursor = malloc(sizeof(Cursor));
     cursor->table = table;
     cursor->page_num = table->root_page_num;
+    cursor->cell_num = 0;
+
     void* root_node = get_page(table->pager, table->root_page_num);
     uint32_t num_cell = *leaf_node_num_cells(root_node);
     cursor->end_of_table = (num_cell == 0);
+
     return cursor;
 }
 
@@ -487,6 +490,7 @@ void* cursor_value(Cursor* cursor) {
 void cursor_advance(Cursor* cursor) {
     uint32_t page_num = cursor->page_num;
     void* node = get_page(cursor->table->pager, page_num);
+ 
     cursor->cell_num += 1;
     if (cursor->cell_num >= *(leaf_node_num_cells(node))) {
         cursor->end_of_table = true;
@@ -503,6 +507,7 @@ ExecuteResult execute_insert(Statement* statement, Table* table) {
     Row* row_to_insert = &(statement->row_to_insert);
     uint32_t key_to_insert = row_to_insert->id;
     Cursor* cursor = table_find(table, key_to_insert);
+
     if (cursor->cell_num < num_cells) {
         uint32_t key_at_index = *leaf_node_key(node, cursor->cell_num);
         if (key_at_index == key_to_insert) {
@@ -511,6 +516,9 @@ ExecuteResult execute_insert(Statement* statement, Table* table) {
     }
 
     leaf_node_insert(cursor, row_to_insert->id, row_to_insert);
+
+    free(cursor);
+
     return EXECUTE_SUCCESS;
 }
 
